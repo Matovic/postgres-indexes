@@ -34,7 +34,9 @@ WHERE
 
 -- parameter parallel_tuple_cost može za nepoužitie paralelizácie pri podmienke 1
 SHOW parallel_tuple_cost;
+
 SET parallel_tuple_cost = 0;
+
 SET parallel_tuple_cost = 0.1;
 
 -- 5.
@@ -113,14 +115,18 @@ CREATE INDEX idx_conversations_content ON conversations USING BTREE(content);
 
 EXPLAIN ANALYSE
 SELECT content FROM conversations 
-WHERE 'There are no excuses'* AND possibly_sensitive = TRUE;
+WHERE possibly_sensitive = TRUE AND content LIKE 'There are no excuses%';
 
 -- 11.
 -- Vytvorte nový btree index, tak aby ste pomocou neho vedeli vyhľadať tweet, ktorý končí
 -- reťazcom „https://t.co/pkFwLXZlEm“ kde nezáleží na tom ako to napíšete. Popíšte čo
 -- jednotlivé funkcie robia.
 
-CREATE INDEX idx_conversations_content ON conversations USING BTREE(content);
+--CREATE INDEX idx_conversations_content_url ON conversations USING BTREE(content);
+
+EXPLAIN ANALYSE
+SELECT content FROM conversations 
+WHERE LOWER(content) LIKE LOWER('%https://t.co/pkFwLXZlEm');
 
 -- *'https://t.co/pkFwLXZlEm'
 
