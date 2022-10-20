@@ -139,18 +139,22 @@ WHERE LOWER(content) LIKE LOWER('%https://t.co/pkFwLXZlEm');
 
 EXPLAIN ANALYSE
 SELECT content FROM conversations
-WHERE reply_count > 150 AND retweet_count >= 500
+WHERE reply_count > 150 AND retweet_count >= 5000
 ORDER BY quote_count;
 
 DROP INDEX idx_conversations_reply_count;
-DROP INDEX idx_conversations_retweet_count;
+--DROP INDEX idx_conversations_retweet_count;
 DROP INDEX idx_conversations_quote_count;
-DROP INDEX idx_covnersations_content;
+--DROP INDEX idx_covnersations_content;
+DROP INDEX idx_conversations_12;
 
 CREATE INDEX idx_conversations_reply_count ON conversations USING BTREE(reply_count);
-CREATE INDEX idx_conversations_retweet_count ON conversations USING BTREE(retweet_count);
+--CREATE INDEX idx_conversations_retweet_count ON conversations USING BTREE(retweet_count);
 CREATE INDEX idx_conversations_quote_count ON conversations USING BTREE(quote_count);
-CREATE INDEX idx_conversations_content ON conversations USING BTREE(content);
+--CREATE INDEX idx_conversations_content ON conversations USING BTREE(content);
+
+CREATE INDEX idx_conversations_12 ON conversations USING BTREE(content)
+WHERE reply_count > 150 AND retweet_count >= 5000;
 
 
 -- 13.
