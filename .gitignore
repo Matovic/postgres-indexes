@@ -11,7 +11,7 @@
 *.pdf
 
 # ignore odt files
-*.odt
+# *.odt
 
 # ignore data folders
 # data/
