@@ -122,7 +122,8 @@ WHERE possibly_sensitive = TRUE AND content LIKE 'There are no excuses%';
 -- reťazcom „https://t.co/pkFwLXZlEm“ kde nezáleží na tom ako to napíšete. Popíšte čo
 -- jednotlivé funkcie robia.
 
---CREATE INDEX idx_conversations_content_url ON conversations USING BTREE(content);
+CREATE INDEX idx_conversations_content_tweet ON conversations USING BTREE(content)
+WHERE LOWER(content) LIKE LOWER('%https://t.co/pkFwLXZlEm');
 
 EXPLAIN ANALYSE
 SELECT content FROM conversations 
@@ -134,13 +135,12 @@ WHERE LOWER(content) LIKE LOWER('%https://t.co/pkFwLXZlEm');
 -- Nájdite conversations, ktoré majú reply_count väčší ako 150, retweet_count väčší rovný
 -- ako 5000 a výsledok zoraďte podľa quote_count. Následne spravte jednoduché indexy a
 -- popíšte ktoré má a ktoré nemá zmysel robiť a prečo. Popíšte a vysvetlite query plan, ktorý sa
--- a plikuje v prípade použitia jednoduchých indexov.
+-- aplikuje v prípade použitia jednoduchých indexov.
 
 EXPLAIN ANALYSE
-ASC
 SELECT content FROM conversations
 WHERE reply_count > 150 AND retweet_count >= 500
-ON quote_count;
+ORDER BY quote_count;
 
 DROP INDEX idx_conversations_reply_count;
 DROP INDEX idx_conversations_retweet_count;
@@ -178,8 +178,10 @@ CREATE INDEX idx_conversations_gist ON conversations USING GIST(content);
 
 EXPLAIN ANALYSE
 SELECT content FROM conversations
-WHERE possibly_sensitive = TRUE AND 'Putin' AND 'New World Order'
-
+--WHERE possibly_sensitive = TRUE AND content LIKE 'Putin' AND content LIKE 'New World Order';
+WHERE 
+	possibly_sensitive = TRUE AND 
+	to_tsvector('simple', content) @@ to_tsquery('simple', 'Putin:*') @@ to_tsquery('simple', 'New World Order:*');
 -- 15.
 -- Vytvorte vhodný index pre vyhľadávanie v links.url tak aby ste našli kampane z
 -- ‘darujme.sk’. Ukážte dotaz a použitý query plan. Vysvetlite prečo sa použil tento index.
