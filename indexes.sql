@@ -190,12 +190,10 @@ WHERE
 	
 DROP INDEX idx_authors_gin_16;
 CREATE INDEX idx_authors_gin_16 ON authors USING GIN(
-	to_tsvector('english', username),
-	to_tsvector('english', description)
+	to_tsvector('english', username || ' ' || description)
 )
 WHERE
-	to_tsvector('english', authors.username) || 
-	to_tsvector('english', authors.description) @@
+	to_tsvector('english', username || ' ' || description) @@
 	to_tsquery('Володимир & Президент');
 
 
@@ -218,9 +216,11 @@ SELECT authors.username, authors.description, conversations.content
 FROM authors --CROSS JOIN conversations
 JOIN conversations ON authors.id = conversations.author_id
 WHERE
-	to_tsvector('english', authors.username || authors.description || conversations.content) @@
+	to_tsvector('english', authors.username || ' ' || authors.description || ' ' || conversations.content) @@
 	to_tsquery('Володимир & Президент')
 ORDER BY conversations.retweet_count DESC;
+
+--SELECT * FROM authors WHERE id=4067797978;
 
 "Володимир" a "Президент"
 
