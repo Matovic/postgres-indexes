@@ -99,9 +99,6 @@ SELECT * FROM bt_page_stats('idx_conversations_retweet_count', 1);
 
 
 -- 9.
--- Vyhľadajte v conversations content meno „Gates“ na ľubovoľnom mieste a porovnajte
--- výsledok po tom, ako content naindexujete pomocou btree. V čom je rozdiel a prečo?
-
 EXPLAIN ANALYSE
 SELECT content FROM conversations 
 WHERE content LIKE '%Gates%';
@@ -110,86 +107,67 @@ DROP INDEX idx_conversations_content;
 CREATE INDEX idx_conversations_content ON conversations USING BTREE(content);
 
 -- 10.
--- Vyhľadajte tweet, ktorý začína “There are no excuses” a zároveň je obsah potenciálne
--- senzitívny (possibly_sensitive). Použil sa index? Prečo? Ako query zefektívniť?
-
 EXPLAIN ANALYSE
 SELECT content FROM conversations 
 WHERE possibly_sensitive = TRUE AND content LIKE 'There are no excuses%';
 
 -- 11.
--- Vytvorte nový btree index, tak aby ste pomocou neho vedeli vyhľadať tweet, ktorý končí
--- reťazcom „https://t.co/pkFwLXZlEm“ kde nezáleží na tom ako to napíšete. Popíšte čo
--- jednotlivé funkcie robia.
+DROP INDEX idx_conversations_content_tweet;
 
 CREATE INDEX idx_conversations_content_tweet ON conversations USING BTREE(content)
-WHERE LOWER(content) LIKE LOWER('%https://t.co/pkFwLXZlEm');
+WHERE LOWER(REVERSE(content)) LIKE LOWER(REVERSE('%https://t.co/pkFwLXZlEm'));
 
 EXPLAIN ANALYSE
 SELECT content FROM conversations 
-WHERE LOWER(content) LIKE LOWER('%https://t.co/pkFwLXZlEm');
-
--- *'https://t.co/pkFwLXZlEm'
+WHERE LOWER(REVERSE(content)) LIKE LOWER(REVERSE('%https://t.co/pkFwLXZlEm'));
 
 -- 12.
--- Nájdite conversations, ktoré majú reply_count väčší ako 150, retweet_count väčší rovný
--- ako 5000 a výsledok zoraďte podľa quote_count. Následne spravte jednoduché indexy a
--- popíšte ktoré má a ktoré nemá zmysel robiť a prečo. Popíšte a vysvetlite query plan, ktorý sa
--- aplikuje v prípade použitia jednoduchých indexov.
-
 EXPLAIN ANALYSE
 SELECT content FROM conversations
 WHERE reply_count > 150 AND retweet_count >= 5000
 ORDER BY quote_count;
 
 DROP INDEX idx_conversations_reply_count;
---DROP INDEX idx_conversations_retweet_count;
 DROP INDEX idx_conversations_quote_count;
---DROP INDEX idx_covnersations_content;
 DROP INDEX idx_conversations_12;
 
 CREATE INDEX idx_conversations_reply_count ON conversations USING BTREE(reply_count);
---CREATE INDEX idx_conversations_retweet_count ON conversations USING BTREE(retweet_count);
 CREATE INDEX idx_conversations_quote_count ON conversations USING BTREE(quote_count);
---CREATE INDEX idx_conversations_content ON conversations USING BTREE(content);
 
 CREATE INDEX idx_conversations_12 ON conversations USING BTREE(content)
 WHERE reply_count > 150 AND retweet_count >= 5000;
 
 
 -- 13.
--- Na predošlú query spravte zložený index a porovnajte výsledok s tým, kedy sú indexy
--- separátne. Výsledok zdôvodnite. Popíšte použitý query plan. Aký je v nich rozdiel?
-
-
-CREATE INDEX idx_conversations ON conversations USING BTREE(
+CREATE INDEX idx_conversations_13 ON conversations USING BTREE(
 	content,
 	reply_count, 
 	retweet_count, 
 	quote_count
-);
+) WHERE reply_count > 150 AND retweet_count >= 5000;
 
 
 -- 14.
--- Napíšte dotaz tak, aby sa v obsahu konverzácie našlo slovo „Putin“ a zároveň spojenie
--- „New World Order“, kde slová idú po sebe a zároveň obsah je senzitívny. Vyhľadávanie má
--- byť indexe. Popíšte použitý query plan pre GiST aj pre GIN. Ktorý je efektívnejší?
+DROP INDEX idx_conversations_gin;
+CREATE INDEX idx_conversations_gin ON conversations USING GIN(to_tsvector('simple', content))
+WHERE possibly_sensitive = TRUE AND content LIKE '%Putin%New World Order%';
 
-
-CREATE INDEX idx_conversations_gin ON conversations USING GIN(content);
-CREATE INDEX idx_conversations_gist ON conversations USING GIST(content);
-
+DROP INDEX idx_conversations_gist;
+CREATE INDEX idx_conversations_gist ON conversations USING GIST(to_tsvector('simple', content))
+WHERE possibly_sensitive = TRUE AND content LIKE '%Putin%New World Order%';
 
 EXPLAIN ANALYSE
 SELECT content FROM conversations
---WHERE possibly_sensitive = TRUE AND content LIKE 'Putin' AND content LIKE 'New World Order';
 WHERE 
 	possibly_sensitive = TRUE AND 
-	to_tsvector('simple', content) @@ to_tsquery('simple', 'Putin:*') @@ to_tsquery('simple', 'New World Order:*');
--- 15.
--- Vytvorte vhodný index pre vyhľadávanie v links.url tak aby ste našli kampane z
--- ‘darujme.sk’. Ukážte dotaz a použitý query plan. Vysvetlite prečo sa použil tento index.
+	content LIKE '%Putin%New World Order%';
+	--to_tsvector('simple', content) @@ to_tsquery('Putin & New & World & Order');
 
+-- 15.
+CREATE INDEX idx_url ON links USING GIN(to_tsvector('simple', url)) WHERE url LIKE '%darujme.sk%';
+
+EXPLAIN ANALYSE
+SELECT url FROM links WHERE url LIKE '%darujme.sk%';
 
 -- 16.
 -- Vytvorte query pre slová "Володимир" a "Президент" pomocou FTS (tsvector a
@@ -200,8 +178,49 @@ WHERE
 -- sekvenčný scan (správna query dobehne rádovo v milisekundách, max sekundách na super
 -- starých PC). Zdôvodnite čo je problém s OR podmienkou a prečo AND je v poriadku pri joine.
 
-DROP INDEX idx_;
-CREATE INDEX idx_authors_fts ON authors USING GIN(
-	username,
-	description
+DROP INDEX idx_authors_gist_16;
+CREATE INDEX idx_authors_gist_16 ON authors USING GIST(
+	to_tsvector('simple', username),
+	to_tsvector('simple', description)
+)
+WHERE 
+	to_tsvector('simple', authors.username) || 
+	to_tsvector('simple', authors.description) @@
+	to_tsquery('Володимир & Президент');
+	
+DROP INDEX idx_authors_gin_16;
+CREATE INDEX idx_authors_gin_16 ON authors USING GIN(
+	to_tsvector('english', username),
+	to_tsvector('english', description)
+)
+WHERE
+	to_tsvector('english', authors.username) || 
+	to_tsvector('english', authors.description) @@
+	to_tsquery('Володимир & Президент');
+
+
+DROP INDEX idx_conversations_gin_16;
+CREATE INDEX idx_conversations_gin_16 ON conversations USING GIN(
+	to_tsvector('english', content)
+)
+
+DROP INDEX idx_authors_btree_16;
+CREATE INDEX idx_authors_btree_16 ON authors USING BTREE(id);
+
+DROP INDEX idx_conversations_btree_16;
+CREATE INDEX idx_conversations_btree_16 ON conversations USING BTREE(
+	author_id,
+	retweet_count DESC
 );
+
+EXPLAIN ANALYSE
+SELECT authors.username, authors.description, conversations.content 
+FROM authors --CROSS JOIN conversations
+JOIN conversations ON authors.id = conversations.author_id
+WHERE
+	to_tsvector('english', authors.username || authors.description || conversations.content) @@
+	to_tsquery('Володимир & Президент')
+ORDER BY conversations.retweet_count DESC;
+
+"Володимир" a "Президент"
+
