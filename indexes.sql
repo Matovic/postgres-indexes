@@ -97,7 +97,6 @@ SELECT * FROM bt_metap('idx_conversations_retweet_count');
 
 SELECT * FROM bt_page_stats('idx_conversations_retweet_count', 1);
 
-
 -- 9.
 EXPLAIN ANALYSE
 SELECT content FROM conversations 
@@ -137,7 +136,6 @@ CREATE INDEX idx_conversations_quote_count ON conversations USING BTREE(quote_co
 CREATE INDEX idx_conversations_12 ON conversations USING BTREE(content)
 WHERE reply_count > 150 AND retweet_count >= 5000;
 
-
 -- 13.
 CREATE INDEX idx_conversations_13 ON conversations USING BTREE(
 	content,
@@ -145,7 +143,6 @@ CREATE INDEX idx_conversations_13 ON conversations USING BTREE(
 	retweet_count, 
 	quote_count
 ) WHERE reply_count > 150 AND retweet_count >= 5000;
-
 
 -- 14.
 DROP INDEX idx_conversations_gin;
@@ -161,7 +158,6 @@ SELECT content FROM conversations
 WHERE 
 	possibly_sensitive = TRUE AND 
 	content LIKE '%Putin%New World Order%';
-	--to_tsvector('simple', content) @@ to_tsquery('Putin & New & World & Order');
 
 -- 15.
 CREATE INDEX idx_url ON links USING GIN(to_tsvector('simple', url)) WHERE url LIKE '%darujme.sk%';
@@ -170,13 +166,6 @@ EXPLAIN ANALYSE
 SELECT url FROM links WHERE url LIKE '%darujme.sk%';
 
 -- 16.
--- Vytvorte query pre slová "Володимир" a "Президент" pomocou FTS (tsvector a
--- tsquery) v angličtine v stĺpcoch conversations.content, authors.decription a
--- authors.username, kde slová sa môžu nachádzať̌ v prvom, druhom ALEBO treťom stĺpci.
--- Teda vyhovujúci záznam je ak aspoň jeden stĺpec má „match“. Výsledky zoradíte podľa
--- retweet_count zostupne. Pre túto query vytvorte vhodné indexy tak, aby sa nepoužil ani raz
--- sekvenčný scan (správna query dobehne rádovo v milisekundách, max sekundách na super
--- starých PC). Zdôvodnite čo je problém s OR podmienkou a prečo AND je v poriadku pri joine.
 
 DROP INDEX idx_authors_gist_16;
 CREATE INDEX idx_authors_gist_16 ON authors USING GIST(
@@ -196,7 +185,6 @@ WHERE
 	to_tsvector('english', username || ' ' || description) @@
 	to_tsquery('Володимир & Президент');
 
-
 DROP INDEX idx_conversations_gin_16;
 CREATE INDEX idx_conversations_gin_16 ON conversations USING GIN(
 	to_tsvector('english', content)
@@ -213,14 +201,9 @@ CREATE INDEX idx_conversations_btree_16 ON conversations USING BTREE(
 
 EXPLAIN ANALYSE
 SELECT authors.username, authors.description, conversations.content 
-FROM authors --CROSS JOIN conversations
+FROM authors 
 JOIN conversations ON authors.id = conversations.author_id
 WHERE
 	to_tsvector('english', authors.username || ' ' || authors.description || ' ' || conversations.content) @@
 	to_tsquery('Володимир & Президент')
 ORDER BY conversations.retweet_count DESC;
-
---SELECT * FROM authors WHERE id=4067797978;
-
-"Володимир" a "Президент"
-
